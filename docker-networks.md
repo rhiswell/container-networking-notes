@@ -246,3 +246,4 @@ Docker overlay 驱动程序自 Docker Engine 1.9 以来就已存在，并且需�
 - Docker networking. https://github.com/docker/labs/tree/master/networking.
 - Bridge vs macvlan. http://hicu.be/bridge-vs-macvlan.
 - Docker bridge vs linux bridge. http://blog.daocloud.io/docker-bridge/.
+- Docker Networking with Linux. http://www.i3s.unice.fr/~urvoy/docs/VICC/3_vicc.pdf.
