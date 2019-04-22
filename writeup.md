@@ -73,7 +73,7 @@ Docker Engine combines the namespaces, control groups, and UnionFS into a wrappe
 
 See [Swarm mode key concepts](https://docs.docker.com/engine/swarm/key-concepts/#/services-and-tasks) for more details.
 
-##Learn network deployment models by example
+## Learn network deployment models by example
 
 See [Tutorial Application: The Pets APP](https://github.com/docker/labs/blob/master/networking/tutorials.md#overlayarch) for more details.
 
@@ -153,7 +153,89 @@ iptables 是本机包过滤系统，自 2.4 版本以来一直是 Linux 内核�
 
 ## Overlay driver network architecture
 
-TODO
+内置的 Docker overlay network driver 从根本上简化了多主机网络中的许多挑战。 With the overlay driver, multi-host networks are first-class citizens inside Docker without external provisioning or components. 在大规模的集群中，Overlay 使用 Swarm 分布式控制提供 centralized management，stability 和 security。
+
+### VXLAN data plane
+
+覆盖驱动程序使用行业标准的 VXLAN 数据平面，将容器网络与底层物理网络（底层）分离。Docker overlay network 将容器流量封装在 VXLAN 标头中，允许流量穿过物理 L2 或者 L3 网络。无论底层物理拓扑如何，overlay 使得网络分段可动态变化且易于控制。 使用标准 IETF VXLAN 标头可促进标准工具检查和分析网络流量。
+
+自 3.7 版本以来，VXLAN 一直是 Linux 内核的一部分，而 Docker 使用内核的本机 VXLAN 功能来创建 overlay network。Docker overlay 数据路径完全在内核空间中。 这样可以减少上下文切换，减少CPU开销，并在应用程序和物理 NIC 之间实现低延迟和直接的流量路径。
+
+IETF VXLAN（RFC 7348）是一种数据层封装格式，它通过第 3 层网络覆盖第 2 层网段。VXLAN 旨在在标准 IP 网络和共享物理网络基础架构上支持大规模多租户设计。现有的内部部署和基于云的网络可以透明地支持 VXLAN。VXLAN 定义为 MAC-in-UDP 封装，将容器第 2 层帧放置在底层 IP/UDP 头中。底层 IP / UDP 报头提供底层网络上主机之间的传输。The overlay is the stateless VXLAN tunnel that exists as point-to-multipoint connections between each host participating in a given overlay network. 由于覆盖层独立于底层拓扑，因此应用程序变得更加便携。因此，无论是在本地，在开发人员桌面上还是在公共云中，网络策略和连接都对应用程序透明。
+
+![Packet Flow for an Overlay Network](/Users/rh/Workspace/ser140/workspace/container-overlay-networks/assets/packetwalk.png)
+
+In this diagram we see the packet flow on an overlay network. Here are the steps that take place when `c1` sends `c2`packets across their shared overlay network:
+
+- `c1` does a DNS lookup for `c2`. Since both containers are on the same overlay network the Docker Engine local DNS server resolves `c2` to its overlay IP address `10.0.0.3`.
+- An overlay network is a L2 segment so `c1` generates an L2 frame destined for the MAC address of `c2`.
+- The frame is encapsulated with a VXLAN header by the `overlay` network driver. The distributed overlay control plane manages the locations and state of each VXLAN tunnel endpoint so it knows that `c2` resides on `host-B` at the physical address of `192.168.1.3`. That address becomes the destination address of the underlay IP header.
+- Once encapsulated the packet is sent. The physical network is responsible of routing or bridging the VXLAN packet to the correct host.
+- The packet arrives at the `eth0` interface of `host-B` and is decapsulated by the `overlay` network driver. The original L2 frame from `c1` is passed to the `c2`'s `eth0` interface and up to the listening application.
+
+### Overlay driver internal architecture
+
+Docker Swarm 控制平面可自动完成 overlay network 的所有配置。不需要额外配置 VXLAN 或 Linux networking。数据平面加密是可选功能，也可以在创建网络时由 overlay 驱动程序自动配置。用户或网络管理员只需定义网络（docker network create -d overlay ...）并将容器附加到该网络即可。
+
+![Overlay Network Created by Docker Swarm](assets/overlayarch.png)
+
+在覆盖网络创建期间，Docker Engine 会在每台主机上创建覆盖所需的网络基础架构。 每个覆盖创建一个 Linux 桥及其关联的 VXLAN 接口。 仅当在主机上安排连接到该网络的容器时，Docker Engine 才会智能地在主机上实例化 overlay network。 这可以防止不存在连接容器的 overlay network 蔓延。
+
+In the following example we create an overlay network and attach a container to that network. We'll then see that Docker Swarm/UCP automatically creates the overlay network.
+
+```
+# Create an overlay named "ovnet" with the overlay driver
+$ docker network create -d overlay ovnet
+
+# Create a service from an nginx image and connect it to the "ovnet" overlay network
+$ docker service create --network ovnet --name container nginx
+```
+
+When the overlay network is created, you will notice that several interfaces and bridges are created inside the host.
+
+```
+# Run the "ifconfig" command inside the nginx container
+$ docker exec -it container ifconfig
+
+# docker_gwbridge network
+eth0      Link encap:Ethernet  HWaddr 02:42:AC:12:00:04
+          inet addr:172.18.0.4  Bcast:0.0.0.0  Mask:255.255.0.0
+          inet6 addr: fe80::42:acff:fe12:4/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:8 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:8 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0
+          RX bytes:648 (648.0 B)  TX bytes:648 (648.0 B)
+
+# overlay network
+eth1      Link encap:Ethernet  HWaddr 02:42:0A:00:00:07
+          inet addr:10.0.0.7  Bcast:0.0.0.0  Mask:255.255.255.0
+          inet6 addr: fe80::42:aff:fe00:7/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1450  Metric:1
+          RX packets:8 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:8 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0
+          RX bytes:648 (648.0 B)  TX bytes:648 (648.0 B)
+     
+# container loopback
+lo        Link encap:Local Loopback
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          inet6 addr: ::1/128 Scope:Host
+          UP LOOPBACK RUNNING  MTU:65536  Metric:1
+          RX packets:48 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:48 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0
+          RX bytes:4032 (3.9 KiB)  TX bytes:4032 (3.9 KiB)
+```
+
+Two interfaces have been created inside the container that correspond to two bridges that now exist on the host. On overlay networks, each container will have at least two interfaces that connect it to the `overlay` and the `docker_gwbridge`.
+
+| Bridge              | Purpose                                                      |
+| ------------------- | ------------------------------------------------------------ |
+| **overlay**         | The ingress and egress point to the overlay network that VXLAN encapsulates and (optionally) encrypts traffic going between containers on the same overlay network. It extends the overlay across all hosts participating in this particular overlay. One will exist per overlay subnet on a host, and it will have the same name that a particular overlay network is given. |
+| **docker_gwbridge** | The egress bridge for traffic leaving the cluster. Only one `docker_gwbridge` will exist per host. Container-to-Container traffic is blocked on this bridge allowing ingress/egress traffic flows only. |
+
+Docker overlay 驱动程序自 Docker Engine 1.9 以来就已存在，并且需要外部 KV 存储来管理网络状态。Docker 1.12 将控制平面状态集成到 Docker Engine 中，因此不再需要外部存储。 1.12 还引入了一些新功能，包括加密和服务负载平衡。引入的网络功能需要支持它们的 Docker Engine 版本，并且不兼容旧版本的 Docker Engine。
 
 ## Refs
 
