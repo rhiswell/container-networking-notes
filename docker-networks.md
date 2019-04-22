@@ -163,7 +163,7 @@ iptables 是本机包过滤系统，自 2.4 版本以来一直是 Linux 内核�
 
 IETF VXLAN（RFC 7348）是一种数据层封装格式，它通过第 3 层网络覆盖第 2 层网段。VXLAN 旨在在标准 IP 网络和共享物理网络基础架构上支持大规模多租户设计。现有的内部部署和基于云的网络可以透明地支持 VXLAN。VXLAN 定义为 MAC-in-UDP 封装，将容器第 2 层帧放置在底层 IP/UDP 头中。底层 IP / UDP 报头提供底层网络上主机之间的传输。The overlay is the stateless VXLAN tunnel that exists as point-to-multipoint connections between each host participating in a given overlay network. 由于覆盖层独立于底层拓扑，因此应用程序变得更加便携。因此，无论是在本地，在开发人员桌面上还是在公共云中，网络策略和连接都对应用程序透明。
 
-![Packet Flow for an Overlay Network](/Users/rh/Workspace/ser140/workspace/container-overlay-networks/assets/packetwalk.png)
+![Packet Flow for an Overlay Network](./assets/packetwalk.png)
 
 In this diagram we see the packet flow on an overlay network. Here are the steps that take place when `c1` sends `c2`packets across their shared overlay network:
 
