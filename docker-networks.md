@@ -115,7 +115,11 @@ Docker has developed a new way of delivering applications, and with that, contai
 - **Scalability**
   - *How do I ensure that none of these characteristics are sacrificed when scaling applications across many hosts?*
 
-## The container networking model
+## Design of Docker's libnetwork
+
+Libnetwork 项目将遵循 Docker 和 Linux 的理念，开发小型、高度模块化和可组合的工具，这些工具可以独立工作。Libnetwork 旨在满足容器中网络的可组合需求。
+
+### The container networking model
 
 ![Container Networking Model](assets/cnm.png)
 
@@ -123,15 +127,163 @@ Docker 的网络架构构建在一系列的 interfaces 之上，我们称这些 
 
 CNM 中有一些高层的抽象，不依赖于 OS 和基础设施，所以应用无需考虑底层的软件栈。包括：
 
-- **Sandbox** — A Sandbox contains the configuration of a container's network stack. This includes management of the container's interfaces, routing table, and DNS settings. An implementation of a Sandbox could be a Linux Network Namespace, a FreeBSD Jail, or other similar concept. A Sandbox may contain many endpoints from multiple networks.
+- **Sandbox** — A Sandbox contains the configuration of a container's network stack. This includes management of the container's interfaces, routing table, and DNS settings. An implementation of a Sandbox could be a Linux Network Namespace, a FreeBSD Jail, or other similar concept. A Sandbox may contain many endpoggints from multiple networks.
 - **Endpoint** — An Endpoint joins a Sandbox to a Network. The Endpoint construct exists so the actual connection to the network can be abstracted away from the application. This helps maintain portability so that a service can use different types of network drivers without being concerned with how it's connected to that network.
 - **Network** — The CNM does not specify a Network in terms of the OSI model. An implementation of a Network could be a Linux bridge, a VLAN, etc. A Network is a collection of endpoints that have connectivity between them. Endpoints that are not connected to a network will not have connectivity on a Network.
+
+### CNM objects
+
+- NetworkController - NetworkController 对象为 libnetwork 提供入口点，为用户（如 Docker Engine）公开简单的 API 以分配和管理网络。 Libnetwork 支持多个活动驱动程序（内置和远程）。NetworkController 允许用户将特定驱动程序绑定到给定网络。
+- Driver - Driver 不是用户可见对象，但 Driver 提供使网络工作的实际实现。然而，NetworkController 提供了一个 API 来配置任何特定的 Driver，其中包含对 libnetwork 透明的 Driver 特定的选项/标签，但可以由 Driver 直接处理。Driver 既可以内置（例如 Bridge，Host，None和overlay），也可以远程（来自插件提供程序）以满足各种用例和部署方案。此时，Driver 拥有一个 Network，负责管理网络（包括 IPAM 等）。通过让多个 Driver 参与处理各种网络管理功能，可以在将来改进这一点。
+- Network - Network 是如上定义的 CNM：Network 的实现。NetworkController 提供 API 来创建和管理 Network 对象。无论何时创建或更新网络，都会通知相应的驱动程序该事件。Libnetwork 在抽象级别处理 Network 对象，以提供属于同一网络的一组端点之间的连接，并与其余端点隔离。驱动程序执行提供所需连接和隔离的实际工作。连接可以位于同一主机内，也可以位于多主机中。因此，Network 在群集中具有全局范围。
+- Endpoint - Endpoint 表示一个服务端 Endpoint。它为网络中的容器与网络中其他容器提供的其他服务提供的服务提供连接。Network 提供用于创建和管理 Endpoint 的 API。Endpoint 只能连接到一个网络。对相应的驱动程序进行 Endpoint 创建调用，该驱动程序负责为相应的 Sandbox 分配资源。由于 Endpoint 表示服务而不一定是特定容器，因此 Endpoint 也在集群中具有全局范围。
+- Sandbox - Sandbox 对象表示容器的网络配置，例如 ip-address、mac-address、routes 和 DNS 条目。当用户请求在 Network 上创建 Endpoint 时，将创建 Sandbox 对象。处理 Network 的 Driver 负责分配所需的网络资源（例如 ip-address）并将名为 SandboxInfo 的信息返回给 libnetwork。 libnetwork 将使用特定于操作系统的构造（例如：netns for Linux）将网络配置填充到 Sandbox 所代表的容器中。Sandbox 可以将多个 Endpoint 连接到不同的 Network。由于 Sandbox 与给定主机中的特定容器相关联，因此它具有表示 Container 所属的主机的本地范围。
+
+### CNM attributes
+
+- Options - Options 提供了一种通用且灵活的机制，可以直接从用户向 Driver 传递特定于 Driver 的配置选项。Options 只是数据的键值对，其中 key 由字符串表示，value 由通用对象表示（例如 golang interface {}）。如果 key 与 net-labels 包中定义的任何已知 Label 匹配，则只能在 Options 上运行Libnetwork。Options 还包括 Labels，如下所述。 Options 通常不是最终用户可见的（在 UI 中），而 Labels 是。
+- Labels - Labels 与 Options 非常相似，实际上它们只是 Options 的一个子集。Labels 通常是最终用户可见的，并使用 --labels 选项显式在 UI 中表示。它们从 UI 传递到 Driver，以便 Driver 可以使用它并执行任何特定于 Driver 的操作（例如从 Network 的特定子网中分配 IP 地址）。
+
+### CNM lifecycle
+
+CNM 的消费者（例如 Docker）通过 CNM Objects 及其 API 进行交互，以便对他们管理的容器进行联网。
+
+1. Drivers 向 NetworkController 注册。内置驱动程序在 LibNetwork 内部注册，而远程驱动程序通过 Plugin 机制向 LibNetwork 注册。（插件机制 WIP）。每个 Driver 处理特定的 networkType。
+2. NetworkController 对象是使用 `libnetwork.New()` API 创建的，用于管理 Networks 分配，还可以选择使用 Driver 特定的选项配置 Driver。i.e. `controller = libnetwork.New()`。
+3. 通过提供 name 和 networkType，使用 `controller.NewNetwork()` API 创建 Network。networkType 参数有助于选择相应的 Driver 并将创建的 Network 绑定到该 Driver。从这一点开始，该 Driver 将处理 Network 上的任何操作。
+4. `controller.NewNetwork()` API 还接受可选参数，该参数包含特定于 Driver 的 Options 和 Labels，Driver 可以将其用于其目的。i.e. `network = controller.NewNetwork(name, networkType, options, labels)`。
+5. 可以调用 `network.CreateEndpoint()` 在给定 Network 中创建新的 Endpoint。此 API 还接受 Driver 可以使用的可选 Options 参数。 这些 Options 包含众所周知的 Labels 和特定于 Driver 的 Labels。Driver 将依次使用 `driver.CreateEndpoint` 调用，并且可以选择在网络中创建 Endpoint 时保留 IPv4 / IPv6 地址。Driver 将使用 driver API 中定义的 InterfaceInfo 接口分配这些地址。需要 IP / IPv6 作为服务定义以及 Endpoint 公开的端口来完成端点，因为服务端点本质上只是网络地址和应用程序容器正在侦听的端口号。i.e. `endpoint = network.CreateEndpoint(IP, port)`。
+6. `endpoint.Join()` 可用于将容器附加到 Endpoint。如果该容器尚不存在，则 Join 操作将创建一个 Sandbox。Driver 可以使用 Sandbox Key 来标识连接到同一容器的多个 Endpoints。此 API 还接受 Driver 可以使用的可选 Options 参数。i.e. `sbx = controller.NewSandBox(); endpoint.Join(sbx)`。
+7. 虽然它不是 LibNetwork 的直接设计问题，但强烈建议像 Docker 这样的用户在 Container 的 `Start()` 生命周期中调用 `endpoint.Join()`，该生命周期在容器运行之前调用。作为 Docker 集成的一部分，我们将对此进行处理。
+8. 关于 Endpoint `join()` API 的常见问题解答之一就是，为什么我们需要一个 API 来创建一个 Endpoint，另一个来 Join Endpoint。答案是基于 Endpoint 代表一个服务，该服务可能由 Container 支持也可能不支持。 创建 Endpoint 时，它将保留其资源，以便以后任何容器都可以连接到 Endpoint 并获得一致的网络行为。
+9. 当容器停止时，可以调用 `endpoint.Leave()`。Driver 可以清除在` Join()` 调用期间分配的状态。 当最后一个引用 Endpoint 离开网络时，LibNetwork 将删除 Sandbox。但只要 Endpoint 仍然存在，LibNetwork 就会保留 IP 地址，并在容器（或任何容器）再次加入时重用。这可确保容器的资源在再次停止和启动时重复使用。i.e. `endpoint.Leave(idx_of_sandbox)`。
+10. `endpoint.Delete()` 用于从网络中删除端点。这导致删除端点并清理缓存的 sandbox.Info。
+11. `network.Delete()` 用于删除网络。如果网络上附加了任何现有端点，LibNetwork 将不允许删除。
+
+### Implementation details
+
+#### Networks & Endpoints
+
+Libnetwork 的 network 和 endpoint API 主要用于管理相应的对象并将其保存，以提供 CNM 所需的抽象级别。它将实际实现委托给驱动程序，这些驱动程序实现了 CNM 中承诺的功能。有关这些详细信息的更多信息，请参阅驱动程序部分。
+
+#### Sandbox
+
+Libnetwork 提供了在多个操作系统中实现 Sandbox 的框架。目前，我们已经使用 sandbox 
+ 包中的 namespace_linux.go 和 configure_linux.go 实现了 Sandbox for Linux。这将为每个沙箱创建一个网络命名空间，该命名空间由主机文件系统上的路径唯一标识。Netlink 调用用于将接口从全局命名空间移动到 Sandbox 命名空间。Netlink 还用于管理命名空间中的路由表。
+
+### Using `libnetwork`
+
+```go
+import (
+	"fmt"
+	"log"
+
+	"github.com/docker/docker/pkg/reexec"
+	"github.com/docker/libnetwork"
+	"github.com/docker/libnetwork/config"
+	"github.com/docker/libnetwork/netlabel"
+	"github.com/docker/libnetwork/options"
+)
+
+func main() {
+	if reexec.Init() {
+		return
+	}
+
+	// Select and configure the network driver
+	networkType := "bridge"
+
+	// Create a new controller instance
+	driverOptions := options.Generic{}
+	genericOption := make(map[string]interface{})
+	genericOption[netlabel.GenericData] = driverOptions
+	controller, err := libnetwork.New(config.OptionDriverConfig(networkType, genericOption))
+	if err != nil {
+		log.Fatalf("libnetwork.New: %s", err)
+	}
+
+	// Create a network for containers to join.
+	// NewNetwork accepts Variadic optional arguments that libnetwork and Drivers can use.
+	network, err := controller.NewNetwork(networkType, "network1", "")
+	if err != nil {
+		log.Fatalf("controller.NewNetwork: %s", err)
+	}
+
+	// For each new container: allocate IP and interfaces. The returned network
+	// settings will be used for container infos (inspect and such), as well as
+	// iptables rules for port publishing. This info is contained or accessible
+	// from the returned endpoint.
+	ep, err := network.CreateEndpoint("Endpoint1")
+	if err != nil {
+		log.Fatalf("network.CreateEndpoint: %s", err)
+	}
+
+	// Create the sandbox for the container.
+	// NewSandbox accepts Variadic optional arguments which libnetwork can use.
+	sbx, err := controller.NewSandbox("container1",
+		libnetwork.OptionHostname("test"),
+		libnetwork.OptionDomainname("docker.io"))
+	if err != nil {
+		log.Fatalf("controller.NewSandbox: %s", err)
+	}
+
+	// A sandbox can join the endpoint via the join api.
+	err = ep.Join(sbx)
+	if err != nil {
+		log.Fatalf("ep.Join: %s", err)
+	}
+
+	// libnetwork client can check the endpoint's operational data via the Info() API
+	epInfo, err := ep.DriverInfo()
+	if err != nil {
+		log.Fatalf("ep.DriverInfo: %s", err)
+	}
+
+	macAddress, ok := epInfo[netlabel.MacAddress]
+	if !ok {
+		log.Fatalf("failed to get mac address from endpoint info")
+	}
+
+	fmt.Printf("Joined endpoint %s (%s) to sandbox %s (%s)\n", ep.Name(), macAddress, sbx.ContainerID(), sbx.Key())
+}
+```
+
+### Drivers
+
+#### API
+
+Driver 本质上是 libnetwork 的扩展，并为上面定义的所有 LibNetwork API 提供实际的实现。因此，所有 Network 和 Endpoint API 都有 1-1 对应关系，其中包括：
+
+- driver.Config
+- driver.CreateNetwork
+- driver.DeleteNetwork
+- driver.CreateEndpoint
+- driver.DeleteEndpoint
+- driver.Join
+- driver.Leave
+
+These Driver facing APIs make use of unique identifiers (`networkid`,`endpointid`,...) instead of names (as seen in user-facing APIs).
+
+#### Driver semantics
+
+- Driver.CreateEndpoint
+
+This method is passed an interface `EndpointInfo`, with methods `Interface` and `AddInterface`. 如果 Interface 返回的值是非零的，则期望 Driver 利用其中的接口信息（e.g., treating the address or addresses as statically supplied），如果不能，则必须返回错误。如果值为 nil，则 Driver 应该只分配一个新的 Interface，并使用 AddInterface 来记录它们；如果不能，则返回错误。It is forbidden to use `AddInterface` if `Interface` is non-nil.
+
+### Implementations
+
+Libnetwork includes the following driver packages:
+
+- null - The null driver is a `noop` implementation of the driver API, used only in cases where no networking is desired. This is to provide backward compatibility to the Docker's `--net=none` option.
+- bridge - The `bridge` driver provides a Linux-specific bridging implementation based on the Linux Bridge. For more details, please [see the Bridge Driver documentation](https://github.com/docker/libnetwork/blob/master/docs/bridge.md).
+- overlay - The `overlay` driver implements networking that can span multiple hosts using overlay network encapsulations such as VXLAN. For more details on its design, please see the [Overlay Driver Design](https://github.com/docker/libnetwork/blob/master/docs/overlay.md).
+- remote - The `remote` package does not provide a driver, but provides a means of supporting drivers over a remote transport. This allows a driver to be written in a language of your choice. For further details, please see the [Remote Driver Design](https://github.com/docker/libnetwork/blob/master/docs/remote.md).
 
 ## Linux network fundamentals
 
 Linux kernel 已经包含了一个成熟且高效的 TCP/IP 协议栈，包括 DNS 和 VXLAN。Docker networking 在这些基础上（low level primitives）构建了高层的 network drivers。简而言之，Docker 网络就是 Linux 网络。
 
-现有 Linux 内核功能的这种实现确保了高性能和健壮性。 最重要的是，它提供了多发行版间的可移植性，从而增强了应用程序的可移植性。
+现有 Linux 内核功能的这种实现确保了高性能和健壮性。最重要的是，它提供了多发行版间的可移植性，从而增强了应用程序的可移植性。
 
 Docker 使用若干 Linux 网络模块来实现其内置的 CNM 网络驱动程序，包括 Linux bridge，network namespaces，veth pair 和 iptables。The combination of these tools implemented as network drivers provide the forwarding rules, network segmentation, and management tools for complex network policy.
 
@@ -247,3 +399,4 @@ Docker overlay 驱动程序自 Docker Engine 1.9 以来就已存在，并且需�
 - Bridge vs macvlan. http://hicu.be/bridge-vs-macvlan.
 - Docker bridge vs linux bridge. http://blog.daocloud.io/docker-bridge/.
 - Docker Networking with Linux. http://www.i3s.unice.fr/~urvoy/docs/VICC/3_vicc.pdf.
+- Design of Docker's libnetwork. https://github.com/docker/libnetwork/blob/master/docs/design.md.
