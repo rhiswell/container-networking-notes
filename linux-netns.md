@@ -1,6 +1,6 @@
 # Linux Network Namespaces
 
-## Concepts and Impl. of Linux namespaces
+## Concepts and impl. of Linux namespaces
 
 关于 Linux namespaces 和 cgroups 的实现细节可以参见 Rami Rosen 分享的 [slide](http://www.haifux.org/lectures/299/netLec7.pdf)。根据 Rosen 的介绍，namespaces 是一种轻量级的进程虚拟化方案（lightweight process virtualization）。Namespace 提供的隔离性（isolation）enable a process (or serveral processes) to have different views of the system than other processes。相比 OS virtualization 如 KVM、Xen，Linux namespace 省去了 hypervisor layer，所以很 lightweight。
 
