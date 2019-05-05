@@ -20,7 +20,7 @@ Docker 于 2013 年初开始在 dotCloud（一家以云为中心的 PaaS 公司�
 
 ![virt-trends](assets/virt-trends.png)
 
-##Under the hood
+## Under the hood
 
 Docker 利用一些强大的 kernel-level 技术，并将其置于触手可及的位置。虚拟化容器的概念已存在多年，但通过提供简单的工具集和统一的 API 来管理一些内核级技术，例如 LXC（LinuX Containers）、cgroups 和 copy-on-write 文件系统，Docker 创建了一个大于其各部分之和的工具。这让其成为 DevOps、系统管理员和开发人员的潜在游戏改变者。
 

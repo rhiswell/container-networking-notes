@@ -2,13 +2,13 @@
 
 ## My notes
 
-- [x] [Linux Network Namespaces](./linux-netns.md)
-- [x] [Docker: Lightweight Linux Containers for Consistent Development and Deployment](./docker-intro.md)
-- [x] [Docker Networks @official-doc](./docker-networks.md)
-- [ ] [Container Networks @book](./container-networks.md)
-- [ ] [Docker Networks: Bridge Mode](./docker-bridge)
-- [x] [VXLAN](./vxlan.md)
-- [ ] [Docker Overlay Networks](./docker-overlay-networks)
+- [x] [Linux Network Namespaces](linux-netns.md)
+- [x] [Docker: Lightweight Linux Containers for Consistent Development and Deployment](docker-intro.md)
+- [x] [Docker Networks @official-doc](docker-networks.md)
+- [ ] [Container Networks @book](container-networks.md)
+- [ ] [Docker Networks: Bridge Mode](docker-bridge.md)
+- [x] [VXLAN](vxlan.md)
+- [ ] [Docker Overlay Networks](docker-overlay-networks.md)
 
 ## Good readings
 
