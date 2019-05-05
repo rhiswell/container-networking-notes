@@ -9,6 +9,7 @@
 - [ ] [Docker Networks: Bridge Mode](docker-bridge.md)
 - [x] [VXLAN](vxlan.md)
 - [ ] [Docker Overlay Networks](docker-overlay-networks.md)
+- [x] [VirtIO](virtio.md)
 
 ## Good readings
 
