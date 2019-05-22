@@ -24,7 +24,7 @@ FreeFlow 的设计解决了两个关键挑战。首先，我们希望 FreeFlow �
 
 ![1558513591357](assets/1558513591357.png)
 
-##Transparent Support for RDMA Operations
+## Transparent Support for RDMA Operations
 
 ### Connection Establishment
 
@@ -61,7 +61,7 @@ FreeFlow 的设计解决了两个关键挑战。首先，我们希望 FreeFlow �
 
 ### Verbs Forwarding via File Descriptor
 
-![img](file:///home/rh/Workspace/ser140/workspace/container-networks/paper-notes/assets/1558520239823.png?lastModify=1558520247)
+![img](assets/1558520239823.png)
 
 ### Fastpath between FFL and FFR
 
