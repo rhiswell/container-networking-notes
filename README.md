@@ -11,7 +11,7 @@
 - [x] [VirtIO](virtio.md)
 - [x] [Docker Overlay Networks](docker-overlay-networks.md)
 - [x] [VXLAN](vxlan.md)
-- [ ] [Kubernetes Networks](k8s-networks.md)
+- [x] [Kubernetes Networks](k8s-networks.md)
 
 ## Good readings
 
@@ -19,3 +19,5 @@
 - Resource Management: Linux Kernel Namespace and cgroups. http://www.haifux.org/lectures/299/netLec7.pdf.
 - Container Networking: From Docker to Kubernetes. https://www.li9.com/wp-content/uploads/2018/07/Container-Networking-Docker-Kubernetes-180701.pdf.
 - Network Algorithmics: An Interdisciplinary Approach to Designing Fast Networked Devices. https://dl.acm.org/citation.cfm?id=1203994.
+- Docker Pro. https://book.douban.com/subject/26701218/.
+- Understanding Linux Network Internals. https://dl.acm.org/citation.cfm?id=1162208.
