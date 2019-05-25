@@ -94,9 +94,9 @@ Refs:
 
 ## 网卡收包流程
 
-![img](./assets/pkt_recving_flow.png)
+![img](./assets/pkt_recving_flow.1.png)
 
-![img](./assets/pkt_recving_flow_nq.png)
+![img](./assets/pkt_recving_flow_nq.1.png)
 
 一般来说，OS（Linux）收包的流程如下：
 

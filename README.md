@@ -6,12 +6,14 @@
 - [ ] [Linux Control Groups](linux-cgroups.md)
 - [x] [Docker: Lightweight Linux Containers for Consistent Development and Deployment](docker-intro.md)：一篇介绍 Docker 的文章，很经典。
 - [x] [Docker Networks @official-doc](docker-networks.md)：给出了 Docker 网络的全貌。
-- [ ] [Container Networks @book](container-networks.md)：给出了 Container 网络的全貌。
+- [ ] [~~Container Networks @book~~](container-networks.md)：给出了 Container 网络的全貌。
 - [x] [Docker Networks: Bridge Mode](docker-bridge.md)
 - [x] [VirtIO](virtio.md)
 - [x] [Docker Overlay Networks](docker-overlay-networks.md)
 - [x] [VXLAN](vxlan.md)
 - [x] [Kubernetes Networks](k8s-networks.md)
+- [ ] [Container Network Interface](cni.md)
+- [ ] [Open vSwitch](ovs.md)
 
 ## Good readings
 
