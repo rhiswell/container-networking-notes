@@ -5,8 +5,6 @@
 - Container Principles and Networks
   - [x] [Linux Network Namespaces](linux-netns.md)：Rosen 带我们过一遍 Linux namespaces 和 cgroups 的原理、应用和实现。
   - [ ] [Linux Control Groups](linux-cgroups.md)
-
-
   - [x] [Docker: Lightweight Linux Containers for Consistent Development and Deployment](docker-intro.md)：一篇介绍 Docker 的文章，很经典。
   - [x] [Docker Networks @official-doc](docker-networks.md)：给出了 Docker 网络的全貌。
   - [ ] [~~Container Networks @book~~](container-networks.md)：给出了 Container 网络的全貌。
@@ -14,15 +12,14 @@
   - [x] [Docker Overlay Networks](docker-overlay-networks.md)
   - [x] [Kubernetes Networks](k8s-networks.md)
   - [ ] [CNM vs CNI](cnm-vs-cni.md)
-- Virtualization
 
+- Virtualization
   - [x] [VirtIO](virtio.md)
   - [x] [VXLAN](vxlan.md)
   - [x] [Open vSwitch](ovs.md)：简单给出 OVS 的动机，还未深入原理。
   - [x] [Linux TUN/TAP vs VETH](tuntap-vs-veth.md)
 
 - Linux Network Internals
-
   - [ ] [BSD Socket](bsd-socket.md)
   - [ ] [Linux TCP/IP Stack](linux-tcpip-stack.md)
   - [ ] [Linux Netfilter](linux-netfilter.md)
