@@ -23,3 +23,4 @@
 ## Refs
 
 - Ch9. Queueing Disciplines for Bandwith Management. http://www.tldp.org/HOWTO/Adv-Routing-HOWTO/lartc.qdisc.html. 
+- Journey to the Center of the Linux Kernel: Traffic Control, Shaping and QoS. http://wiki.linuxwall.info/doku.php/en:ressources:dossiers:networking:traffic_control.

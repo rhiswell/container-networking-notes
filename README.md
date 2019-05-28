@@ -24,7 +24,7 @@
   - [ ] [Linux TCP/IP Stack](linux-tcpip-stack.md)
   - [ ] [Linux Netfilter](linux-netfilter.md)
   - [ ] [Linux Packet Scheduler](linux-pkt-scheduler.md)
-    - [ ] HFSC
+    - [x] HFSC：没看懂！
 
 ## Landscape of Linux kernel
 
@@ -38,4 +38,4 @@
 - Network Algorithmics: An Interdisciplinary Approach to Designing Fast Networked Devices. https://dl.acm.org/citation.cfm?id=1203994.
 - Docker Pro. https://book.douban.com/subject/26701218/.
 - Understanding Linux Network Internals. https://dl.acm.org/citation.cfm?id=1162208.
-- Linux Kernel Networking: Implementation and Theory. <https://dl.acm.org/citation.cfm?id=2568187>.
+- Linux Kernel Networking: Implementation and Theory. https://dl.acm.org/citation.cfm?id=2568187.
