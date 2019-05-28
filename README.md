@@ -24,6 +24,7 @@
   - [ ] [Linux TCP/IP Stack](linux-tcpip-stack.md)
   - [ ] [Linux Netfilter](linux-netfilter.md)
   - [ ] [Linux Packet Scheduler](linux-pkt-scheduler.md)
+    - [ ] HFSC
 
 ## Landscape of Linux kernel
 
